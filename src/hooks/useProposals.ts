@@ -55,7 +55,6 @@ export const useProposals = (
               functionName: 'getProposal',
               args: [BigInt(i)],
             });
-            console.log("🚀 ~ proposalPromises ~ result:", result)
 
             const [description, deadline, status, createdAt, creator] = result;
             return {

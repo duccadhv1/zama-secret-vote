@@ -31,13 +31,11 @@ export default function HomePage() {
 
   const { proposalCount, isTransactionConfirmed } =
     useSecretVote(CONTRACT_ADDRESS);
-  console.log("🚀 ~ HomePage ~ proposalCount:", proposalCount);
   const { proposals, isLoading } = useProposals(
     CONTRACT_ADDRESS,
     proposalCount,
     refreshKey
   );
-  console.log("🚀 ~ HomePage ~ proposals:", proposals);
 
   // Force refresh proposals when a transaction is confirmed
   useEffect(() => {
