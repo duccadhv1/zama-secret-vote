@@ -1,37 +1,85 @@
-# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+# Dependencies
+node_modules/
+.pnpm-store/
 
-# dependencies
-/node_modules
-/.pnp
-.pnp.js
-.yarn/install-state.gz
+# Production builds
+.next/
+build/
+dist/
+out/
 
-# testing
-/coverage
+# Environment variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
 
-# next.js
-/.next/
-/out/
+# Hardhat
+cache/
+artifacts/
+typechain/
+typechain-types/
 
-# production
-/build
+# Deployment
+deployments/
+deployment-*.json
 
-# misc
+# Private keys & security
+private-key.txt
+mnemonic.txt
+keys/
+secrets/
+keystore/
+
+# FHE specific
+fhevm-temp/
+fhe-keys/
+.fhevm/
+src/types/contracts/
+generated/
+fhevm-artifacts/
+
+# Testing
+coverage/
+coverage.json
+.coverage_artifacts/
+.coverage_cache/
+test-results/
+
+# Development tools
+.vscode/settings.json
+.idea/
+*.swp
+*.swo
+
+# OS generated
 .DS_Store
-*.pem
+Thumbs.db
 
-# debug
+# Logs
+*.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+pnpm-debug.log*
 
-# local env files
-.env*.local
-.env
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
 
-# vercel
+# Vercel
 .vercel
 
-# typescript
-*.tsbuildinfo
-next-env.d.ts
+# Railway
+.railway/
+
+# Gas reports
+gas-report.txt
+
+# Temporary files
+*.tmp
+*.temp
+.cache/
