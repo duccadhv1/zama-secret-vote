@@ -19,6 +19,7 @@ import PageTransition from "@/components/layout/PageTransition";
 import WalletNotConnected from "@/components/wallet/WalletNotConnected";
 import NetworkStatus from "@/components/wallet/NetworkStatus";
 import CreateProposalModal from "@/components/voting/CreateProposalModal";
+import { VoteModal } from "@/components/voting/VoteModal";
 import { useSecretVote } from "@/hooks/useSecretVote";
 import { useProposals } from "@/hooks/useProposals";
 
@@ -27,6 +28,11 @@ const CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS ?? "";
 export default function HomePage() {
   const { isConnected } = useAccount();
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showVoteModal, setShowVoteModal] = useState(false);
+  const [selectedProposal, setSelectedProposal] = useState<{
+    id: number;
+    description: string;
+  } | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
 
   const { proposalCount, isTransactionConfirmed } =
@@ -46,6 +52,20 @@ export default function HomePage() {
       }, 2000); // Wait a bit for the blockchain to update
     }
   }, [isTransactionConfirmed]);
+
+  const handleVoteClick = (proposalId: number, description: string) => {
+    setSelectedProposal({ id: proposalId, description });
+    setShowVoteModal(true);
+  };
+
+  const handleVoteModalClose = () => {
+    setShowVoteModal(false);
+    setSelectedProposal(null);
+    // Trigger refresh after voting
+    setTimeout(() => {
+      setRefreshKey((prev) => prev + 1);
+    }, 1000);
+  };
 
   if (!isConnected) {
     return (
@@ -242,6 +262,9 @@ export default function HomePage() {
                           <Button
                             className="flex-1"
                             disabled={proposal.status !== 0}
+                            onClick={() =>
+                              handleVoteClick(proposal.id, proposal.description)
+                            }
                           >
                             Vote
                           </Button>
@@ -286,6 +309,17 @@ export default function HomePage() {
           isOpen={showCreateModal}
           onClose={() => setShowCreateModal(false)}
         />
+
+        {/* Vote Modal */}
+        {selectedProposal && (
+          <VoteModal
+            isOpen={showVoteModal}
+            onClose={handleVoteModalClose}
+            proposalId={selectedProposal.id}
+            proposalDescription={selectedProposal.description}
+            contractAddress={CONTRACT_ADDRESS}
+          />
+        )}
       </div>
     </PageTransition>
   );

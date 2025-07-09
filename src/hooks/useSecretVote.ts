@@ -119,16 +119,11 @@ interface UseSecretVoteReturn {
 
 export const useSecretVote = (contractAddress: string): UseSecretVoteReturn => {
   // Read proposal count
-  const { data: proposalCount, refetch: refetchProposalCount, error: readError, isLoading, isError } = useReadContract({
+  const { data: proposalCount, refetch: refetchProposalCount } = useReadContract({
     address: contractAddress as `0x${string}`,
     abi: SECRET_VOTE_ABI,
     functionName: 'getProposalCount',
   });
-  console.log("🚀 ~ useSecretVote ~ contractAddress:", contractAddress)
-  console.log("🚀 ~ useSecretVote ~ proposalCount:", proposalCount)
-  console.log("🚀 ~ useSecretVote ~ isLoading:", isLoading)
-  console.log("🚀 ~ useSecretVote ~ isError:", isError)
-  console.log("🚀 ~ useSecretVote ~ readError:", readError)
 
   // Write contract hook
   const { writeContract, data: hash, error, isPending } = useWriteContract();
@@ -138,38 +133,69 @@ export const useSecretVote = (contractAddress: string): UseSecretVoteReturn => {
     hash,
   });
 
-  // Get proposal by ID
+  // Get proposal by ID - placeholder for now, will be replaced with proper hooks
   const getProposal = useCallback((id: number): Proposal | undefined => {
-    // This would normally fetch from contract, returning undefined for now
+    // This function is now just a placeholder
+    // Real data fetching is handled in separate hooks
     return undefined;
-  }, []);
+  }, [contractAddress]);
 
-  // Get voting status for user
+  // Get voting status for user - placeholder for now, will be replaced with proper hooks  
   const getHasVoted = useCallback((proposalId: number, voter: string): boolean | undefined => {
-    // This would normally use useReadContract to check voting status
+    // This function is now just a placeholder
+    // Real data fetching is handled in separate hooks
     return undefined;
   }, []);
 
   // Get voting status
   const getVotingStatus = useCallback((proposalId: number): VotingStatus | undefined => {
-    // This would normally fetch from contract
-    return undefined;
+    try {
+      // This would fetch from contract
+      return VotingStatus.Open;
+    } catch (error) {
+      console.error("Error getting voting status:", error);
+      return undefined;
+    }
   }, []);
 
   // Get results
   const getResults = useCallback((proposalId: number): ProposalResults | undefined => {
-    // This would normally fetch from contract
-    return undefined;
+    try {
+      // This would fetch from contract
+      // Return mock results for testing
+      return {
+        counts: [BigInt(10), BigInt(5), BigInt(20), BigInt(15)]
+      };
+    } catch (error) {
+      console.error("Error getting results:", error);
+      return undefined;
+    }
   }, []);
 
   // Create proposal
-  const createProposal = useCallback((description: string, duration: number) => {
-    writeContract({
-      address: contractAddress as `0x${string}`,
-      abi: SECRET_VOTE_ABI,
-      functionName: 'createProposal',
-      args: [description, BigInt(duration)],
-    });
+  const createProposal = useCallback((description: string, duration: number): void => {
+    console.log("🚀 ~ createProposal ~ Starting createProposal function");
+    console.log("Contract Address:", contractAddress);
+    console.log("Description:", description);
+    console.log("Duration:", duration);
+    
+    if (!contractAddress) {
+      console.error("Contract address is not defined");
+      return;
+    }
+    
+    try {
+      console.log("Calling writeContract...");
+      writeContract({
+        address: contractAddress as `0x${string}`,
+        abi: SECRET_VOTE_ABI,
+        functionName: 'createProposal' as const,
+        args: [description, BigInt(duration)],
+      });
+      console.log("writeContract called successfully - MetaMask should prompt now");
+    } catch (error) {
+      console.error("Error in writeContract:", error);
+    }
   }, [contractAddress, writeContract]);
 
   // Vote on proposal

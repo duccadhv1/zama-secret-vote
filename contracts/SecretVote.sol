@@ -148,7 +148,9 @@ contract SecretVote is Ownable, ReentrancyGuard {
         Proposal storage proposal = proposals[proposalId];
         require(proposal.status == VotingStatus.Open, "Decryption already requested or completed");
 
-        proposal.status = VotingStatus.Decrypted; // Simplified - immediately set as decrypted
+        // Set status to DecryptionRequested first, then immediately to Decrypted (simplified)
+        proposal.status = VotingStatus.DecryptionRequested;
+        proposal.status = VotingStatus.Decrypted;
 
         emit ProposalDecrypted(proposalId, proposal.counts);
     }
@@ -164,7 +166,13 @@ contract SecretVote is Ownable, ReentrancyGuard {
         proposalExists(proposalId)
         returns (uint64[4] memory counts)
     {
-        require(proposals[proposalId].status == VotingStatus.Decrypted, "Results not available");
+        // For simplified version, allow viewing results anytime after deadline
+        // In production with FHE, this would require decryption
+        require(
+            block.timestamp >= proposals[proposalId].deadline || 
+            proposals[proposalId].status == VotingStatus.Decrypted, 
+            "Results not available."
+        );
         return proposals[proposalId].counts;
     }
 

@@ -1,150 +1,271 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useAccount } from "wagmi";
 import {
   Dialog,
   DialogContent,
   DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Label } from "@/components/ui/label";
-import { useToast } from "@/hooks/use-toast";
+import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Loader2, CheckCircle, AlertCircle } from "lucide-react";
+import { useSecretVote } from "@/hooks/useSecretVote";
 
 interface VoteModalProps {
   isOpen: boolean;
   onClose: () => void;
   proposalId: number;
+  proposalDescription: string;
+  contractAddress: string;
 }
 
-const VOTE_OPTIONS = [
-  { value: "0", label: "Option A", description: "First choice" },
-  { value: "1", label: "Option B", description: "Second choice" },
-  { value: "2", label: "Option C", description: "Third choice" },
-  { value: "3", label: "Option D", description: "Fourth choice" },
+const voteOptions = [
+  {
+    value: 0,
+    label: "Strongly Against",
+    color: "bg-red-500",
+    description: "I completely disagree with this proposal",
+  },
+  {
+    value: 1,
+    label: "Against",
+    color: "bg-orange-500",
+    description: "I disagree with this proposal",
+  },
+  {
+    value: 2,
+    label: "For",
+    color: "bg-blue-500",
+    description: "I agree with this proposal",
+  },
+  {
+    value: 3,
+    label: "Strongly For",
+    color: "bg-green-500",
+    description: "I completely agree with this proposal",
+  },
 ];
 
-export const VoteModal = ({ isOpen, onClose, proposalId }: VoteModalProps) => {
-  const [selectedChoice, setSelectedChoice] = useState<string>("");
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const { toast } = useToast();
+export function VoteModal({
+  isOpen,
+  onClose,
+  proposalId,
+  proposalDescription,
+  contractAddress,
+}: VoteModalProps) {
+  const [selectedVote, setSelectedVote] = useState<number | null>(null);
+  const [voteSubmitted, setVoteSubmitted] = useState(false);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const { address } = useAccount();
+  const {
+    vote,
+    isVoting,
+    transactionError,
+    transactionHash,
+    isTransactionConfirmed,
+  } = useSecretVote(contractAddress);
 
-    if (!selectedChoice) {
-      toast({
-        title: "Error",
-        description: "Please select a voting option",
-        variant: "destructive",
-      });
-      return;
+  // Reset state when modal opens
+  useEffect(() => {
+    if (isOpen) {
+      setSelectedVote(null);
+      setVoteSubmitted(false);
     }
+  }, [isOpen]);
 
-    setIsSubmitting(true);
+  // Handle successful vote
+  useEffect(() => {
+    if (isTransactionConfirmed && voteSubmitted) {
+      setTimeout(() => {
+        onClose();
+      }, 2000);
+    }
+  }, [isTransactionConfirmed, voteSubmitted, onClose]);
+
+  const handleVote = async () => {
+    if (selectedVote === null) return;
 
     try {
-      // Here you would:
-      // 1. Encrypt the choice using FhEVM
-      // 2. Call the smart contract vote function
-      // For now, just simulate the process
-
-      toast({
-        title: "Encrypting vote...",
-        description: "Please wait while we encrypt your vote",
-      });
-
-      await new Promise((resolve) => setTimeout(resolve, 2000));
-
-      toast({
-        title: "Vote submitted!",
-        description: "Your encrypted vote has been recorded on-chain",
-      });
-
-      setSelectedChoice("");
-      onClose();
+      setVoteSubmitted(true);
+      vote(proposalId, selectedVote);
     } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to submit vote. Please try again.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsSubmitting(false);
+      console.error("Error voting:", error);
+      setVoteSubmitted(false);
+    }
+  };
+
+  const handleClose = () => {
+    if (!isVoting) {
+      onClose();
     }
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[425px]">
+    <Dialog open={isOpen} onOpenChange={handleClose}>
+      <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
           <DialogTitle>Cast Your Vote</DialogTitle>
           <DialogDescription>
-            Proposal #{proposalId}. Your vote will be encrypted and kept private
-            until results are revealed.
+            Choose your position on this proposal. Your vote will be recorded on
+            the blockchain.
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-6">
-          <div className="space-y-4">
-            <Label className="text-base font-medium">Select your choice:</Label>
-            <RadioGroup
-              value={selectedChoice}
-              onValueChange={setSelectedChoice}
-              className="space-y-3"
-            >
-              {VOTE_OPTIONS.map((option) => (
-                <div key={option.value} className="flex items-center space-x-3">
-                  <RadioGroupItem value={option.value} id={option.value} />
-                  <Label
-                    htmlFor={option.value}
-                    className="flex-1 cursor-pointer"
-                  >
-                    <div className="flex flex-col">
-                      <span className="font-medium">{option.label}</span>
-                      <span className="text-sm text-gray-500">
-                        {option.description}
-                      </span>
+        <div className="space-y-6">
+          {/* Proposal Info */}
+          <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
+            <h3 className="font-semibold mb-2">Proposal #{proposalId}</h3>
+            <p className="text-sm text-gray-600 dark:text-gray-400">
+              {proposalDescription}
+            </p>
+          </div>
+
+          {/* Vote Options */}
+          {!voteSubmitted ? (
+            <div className="space-y-3">
+              <h4 className="font-medium">Select your vote:</h4>
+              {voteOptions.map((option) => (
+                <Card
+                  key={option.value}
+                  className={`cursor-pointer transition-all hover:shadow-md ${
+                    selectedVote === option.value
+                      ? "ring-2 ring-blue-500 bg-blue-50 dark:bg-blue-900/20"
+                      : "hover:bg-gray-50 dark:hover:bg-gray-800"
+                  }`}
+                  onClick={() => setSelectedVote(option.value)}
+                >
+                  <CardContent className="p-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div
+                          className={`w-4 h-4 rounded-full ${option.color}`}
+                        />
+                        <div>
+                          <h5 className="font-medium">{option.label}</h5>
+                          <p className="text-sm text-gray-600 dark:text-gray-400">
+                            {option.description}
+                          </p>
+                        </div>
+                      </div>
+                      {selectedVote === option.value && (
+                        <CheckCircle className="h-5 w-5 text-blue-500" />
+                      )}
                     </div>
-                  </Label>
-                </div>
+                  </CardContent>
+                </Card>
               ))}
-            </RadioGroup>
-          </div>
-
-          <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4">
-            <div className="flex items-start space-x-2">
-              <div className="w-5 h-5 rounded-full bg-blue-500 flex items-center justify-center flex-shrink-0 mt-0.5">
-                <span className="text-white text-xs">🔒</span>
-              </div>
-              <div>
-                <p className="text-sm font-medium text-blue-900 dark:text-blue-100">
-                  Privacy Protected
-                </p>
-                <p className="text-xs text-blue-700 dark:text-blue-300 mt-1">
-                  Your vote will be encrypted using Fully Homomorphic
-                  Encryption. No one can see your individual choice until
-                  results are decrypted.
-                </p>
-              </div>
             </div>
-          </div>
+          ) : (
+            <div className="space-y-4">
+              {/* Transaction Status */}
+              {isVoting && (
+                <Alert>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <AlertDescription>
+                    Submitting your vote to the blockchain...
+                  </AlertDescription>
+                </Alert>
+              )}
 
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={onClose}>
+              {transactionHash && !isTransactionConfirmed && (
+                <Alert>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <AlertDescription>
+                    <div className="space-y-2">
+                      <p>Transaction submitted! Waiting for confirmation...</p>
+                      <p className="text-xs font-mono">
+                        Hash: {transactionHash.slice(0, 10)}...
+                        {transactionHash.slice(-8)}
+                      </p>
+                    </div>
+                  </AlertDescription>
+                </Alert>
+              )}
+
+              {isTransactionConfirmed && (
+                <Alert className="border-green-500 bg-green-50 dark:bg-green-900/20">
+                  <CheckCircle className="h-4 w-4 text-green-500" />
+                  <AlertDescription className="text-green-800 dark:text-green-200">
+                    <div className="space-y-2">
+                      <p className="font-semibold">
+                        Vote successfully recorded!
+                      </p>
+                      <p>Your vote has been confirmed on the blockchain.</p>
+                    </div>
+                  </AlertDescription>
+                </Alert>
+              )}
+
+              {transactionError && (
+                <Alert className="border-red-500 bg-red-50 dark:bg-red-900/20">
+                  <AlertCircle className="h-4 w-4 text-red-500" />
+                  <AlertDescription className="text-red-800 dark:text-red-200">
+                    <div className="space-y-2">
+                      <p className="font-semibold">Error submitting vote</p>
+                      <p className="text-sm">{transactionError}</p>
+                    </div>
+                  </AlertDescription>
+                </Alert>
+              )}
+
+              {/* Vote Summary */}
+              {selectedVote !== null && (
+                <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                  <h4 className="font-medium mb-2">Your Vote</h4>
+                  <div className="flex items-center gap-2">
+                    <div
+                      className={`w-3 h-3 rounded-full ${voteOptions[selectedVote].color}`}
+                    />
+                    <span className="font-medium">
+                      {voteOptions[selectedVote].label}
+                    </span>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Error Display */}
+          {transactionError && !voteSubmitted && (
+            <Alert className="border-red-500 bg-red-50 dark:bg-red-900/20">
+              <AlertCircle className="h-4 w-4 text-red-500" />
+              <AlertDescription className="text-red-800 dark:text-red-200">
+                <div className="space-y-2">
+                  <p className="font-semibold">Error</p>
+                  <p className="text-sm">{transactionError}</p>
+                </div>
+              </AlertDescription>
+            </Alert>
+          )}
+
+          {/* Action Buttons */}
+          <div className="flex justify-end gap-3">
+            <Button variant="outline" onClick={handleClose} disabled={isVoting}>
               Cancel
             </Button>
-            <Button type="submit" disabled={isSubmitting || !selectedChoice}>
-              {isSubmitting
-                ? "Encrypting & Submitting..."
-                : "Submit Encrypted Vote"}
-            </Button>
-          </DialogFooter>
-        </form>
+            {!voteSubmitted && (
+              <Button
+                onClick={handleVote}
+                disabled={selectedVote === null || isVoting}
+              >
+                {isVoting ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Submitting...
+                  </>
+                ) : (
+                  "Submit Vote"
+                )}
+              </Button>
+            )}
+          </div>
+        </div>
       </DialogContent>
     </Dialog>
   );
-};
+}
