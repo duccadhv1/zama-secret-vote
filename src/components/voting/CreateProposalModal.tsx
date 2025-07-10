@@ -31,7 +31,7 @@ export const CreateProposalModal = ({
   onClose,
 }: CreateProposalModalProps) => {
   const [description, setDescription] = useState("");
-  const [duration, setDuration] = useState("24"); // hours
+  const [deadline, setDeadline] = useState(""); // Change to deadline datetime
   const { toast } = useToast();
   const { isConnected, address } = useAccount();
 
@@ -43,30 +43,6 @@ export const CreateProposalModal = ({
     isTransactionConfirmed,
   } = useSecretVote(CONTRACT_ADDRESS);
 
-  // Debug logging
-  useEffect(() => {
-    if (isOpen) {
-      console.log("=== CreateProposalModal opened ===");
-      console.log("Wallet connected:", isConnected);
-      console.log("Wallet address:", address);
-      console.log("Contract address:", CONTRACT_ADDRESS);
-      console.log("Hook state:", {
-        isCreatingProposal,
-        transactionHash,
-        transactionError,
-        isTransactionConfirmed,
-      });
-    }
-  }, [
-    isOpen,
-    isConnected,
-    address,
-    isCreatingProposal,
-    transactionHash,
-    transactionError,
-    isTransactionConfirmed,
-  ]);
-
   // Watch for transaction completion
   useEffect(() => {
     if (isTransactionConfirmed && transactionHash) {
@@ -77,7 +53,7 @@ export const CreateProposalModal = ({
 
       // Reset form and close modal
       setDescription("");
-      setDuration("24");
+      setDeadline("");
       onClose();
     }
   }, [isTransactionConfirmed, transactionHash, onClose, toast]);
@@ -93,26 +69,19 @@ export const CreateProposalModal = ({
     }
   }, [transactionError, toast]);
 
-  // Reset submitting state when modal opens
+  // Reset state when modal opens
   useEffect(() => {
     if (isOpen) {
-      // Reset any error states when modal opens
+      // Set default deadline to 24 hours from now
+      const tomorrow = new Date();
+      tomorrow.setHours(tomorrow.getHours() + 24);
+      const isoString = tomorrow.toISOString().slice(0, 16); // Format for datetime-local input
+      setDeadline(isoString);
     }
   }, [isOpen]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
-    console.log("=== Create Proposal Debug ===");
-    console.log("Form submitted with:", { description, duration });
-    console.log("Contract address:", CONTRACT_ADDRESS);
-    console.log("Wallet connected:", isConnected);
-    console.log("Wallet address:", address);
-    console.log("Hook state:", {
-      isCreatingProposal,
-      transactionHash,
-      transactionError,
-    });
 
     if (!isConnected) {
       toast({
@@ -141,6 +110,38 @@ export const CreateProposalModal = ({
       return;
     }
 
+    if (!deadline) {
+      toast({
+        title: "Error",
+        description: "Please select a deadline",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Validate deadline is in the future
+    const deadlineDate = new Date(deadline);
+    const now = new Date();
+    if (deadlineDate <= now) {
+      toast({
+        title: "Error",
+        description: "Deadline must be in the future",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Check minimum duration (1 hour)
+    const minDeadline = new Date(now.getTime() + 5 * 60 * 1000); // 1 hour from now
+    if (deadlineDate < minDeadline) {
+      toast({
+        title: "Error",
+        description: "Deadline must be at least 1 hour from now",
+        variant: "destructive",
+      });
+      return;
+    }
+
     if (!CONTRACT_ADDRESS) {
       toast({
         title: "Error",
@@ -151,20 +152,15 @@ export const CreateProposalModal = ({
     }
 
     try {
-      // Convert hours to seconds
-      const durationInSeconds = parseInt(duration) * 60 * 60;
-
-      console.log("About to call createProposal with params:", {
-        description,
-        durationInSeconds,
-        contractAddress: CONTRACT_ADDRESS,
-        walletAddress: address,
-      });
+      // Calculate duration in seconds from current time to deadline
+      const deadlineDate = new Date(deadline);
+      const now = new Date();
+      const durationInSeconds = Math.floor(
+        (deadlineDate.getTime() - now.getTime()) / 1000
+      );
 
       // Call the smart contract
       createProposal(description, durationInSeconds);
-
-      console.log("createProposal function called - waiting for MetaMask...");
     } catch (error) {
       console.error("Error in handleSubmit:", error);
 
@@ -270,19 +266,20 @@ export const CreateProposalModal = ({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="duration">Voting Duration (hours) *</Label>
+            <Label htmlFor="deadline">Voting Deadline *</Label>
             <Input
-              id="duration"
-              type="number"
-              min="1"
-              max="168" // 1 week
-              value={duration}
-              onChange={(e) => setDuration(e.target.value)}
+              id="deadline"
+              type="datetime-local"
+              value={deadline}
+              onChange={(e) => setDeadline(e.target.value)}
               required
               disabled={isCreatingProposal}
+              min={new Date(Date.now() + 60 * 60 * 1000)
+                .toISOString()
+                .slice(0, 16)} // 1 hour from now
             />
-            <p className="text-sm text-gray-500">
-              Minimum 1 hour, maximum 1 week (168 hours)
+            <p className="text-xs text-gray-500">
+              Select when voting should end. Must be at least 1 hour from now.
             </p>
           </div>
 

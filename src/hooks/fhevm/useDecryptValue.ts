@@ -2,8 +2,8 @@ import { useState } from "react";
 import { getInstance } from "@/lib/fhevm/fhevmjs";
 import { reencryptEuint64 } from "@/lib/fhevm/reencrypt";
 import { Signer } from "ethers";
-import { FhevmInstance } from "fhevmjs";
 import { useFhevm } from "@/providers/FhevmProvider";
+import { FhevmInstance } from "fhevmjs/bundle";
 
 interface useDecryptValueProps {
   signer: Signer | null;

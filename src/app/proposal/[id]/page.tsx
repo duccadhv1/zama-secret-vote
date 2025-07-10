@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useAccount } from "wagmi";
 import { Button } from "@/components/ui/button";
@@ -54,23 +54,28 @@ export default function ProposalDetailPage() {
     isLoading: isLoadingProposal,
     error: proposalError,
   } = useProposal(CONTRACT_ADDRESS, proposalId);
-  const { hasVoted, isLoading: isLoadingHasVoted } = useHasVoted(
-    CONTRACT_ADDRESS,
-    proposalId,
-    address
-  );
+  const {
+    hasVoted,
+    isLoading: isLoadingHasVoted,
+    refetch: refetchHasVoted,
+  } = useHasVoted(CONTRACT_ADDRESS, proposalId, address);
   const {
     results,
     isLoading: isLoadingResults,
     canFetchResults,
+    refetch: refetchResults,
   } = useProposalResults(
     CONTRACT_ADDRESS,
     proposalId,
     proposal // Pass proposal data so hook can check deadline
   );
 
-  const { requestDecryption, isRequestingDecryption, transactionError } =
-    useSecretVote(CONTRACT_ADDRESS);
+  const {
+    requestDecryption,
+    isRequestingDecryption,
+    transactionError,
+    isTransactionConfirmed,
+  } = useSecretVote(CONTRACT_ADDRESS);
 
   // Separate loading states - don't include results loading in main loading
   // because results might not be available yet and that's expected
@@ -85,8 +90,19 @@ export default function ProposalDetailPage() {
 
   const handleVoteModalClose = () => {
     setShowVoteModal(false);
-    // Hooks will automatically refetch data after transaction is confirmed
+    // Refetch voting status immediately after voting
+    refetchHasVoted();
   };
+
+  // Refetch results when decryption transaction is confirmed
+  useEffect(() => {
+    if (isTransactionConfirmed) {
+      // Refetch proposal data and results after decryption
+      setTimeout(() => {
+        refetchResults();
+      }, 1000); // Small delay to ensure blockchain state is updated
+    }
+  }, [isTransactionConfirmed, refetchResults]);
 
   const handleRequestDecryption = () => {
     try {

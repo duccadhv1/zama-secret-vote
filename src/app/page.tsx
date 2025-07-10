@@ -3,25 +3,18 @@
 import { useState, useEffect } from "react";
 import { useAccount } from "wagmi";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Clock, Users, Vote, TrendingUp } from "lucide-react";
-import Link from "next/link";
 import { motion } from "framer-motion";
 import PageTransition from "@/components/layout/PageTransition";
 import WalletNotConnected from "@/components/wallet/WalletNotConnected";
 import NetworkStatus from "@/components/wallet/NetworkStatus";
 import CreateProposalModal from "@/components/voting/CreateProposalModal";
+import ProposalCard from "@/components/voting/ProposalCard";
 import { VoteModal } from "@/components/voting/VoteModal";
 import { useSecretVote } from "@/hooks/useSecretVote";
 import { useProposals } from "@/hooks/useProposals";
+import { useUserVoteCount } from "@/hooks/useUserVoteCount";
 
 const CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS ?? "";
 
@@ -37,21 +30,26 @@ export default function HomePage() {
 
   const { proposalCount, isTransactionConfirmed } =
     useSecretVote(CONTRACT_ADDRESS);
-  const { proposals, isLoading } = useProposals(
+  const {
+    proposals,
+    isLoading,
+    refetch: refetchProposals,
+  } = useProposals(CONTRACT_ADDRESS, proposalCount, refreshKey);
+
+  const { userVoteCount, isLoading: isLoadingVoteCount } = useUserVoteCount(
     CONTRACT_ADDRESS,
-    proposalCount,
+    proposals,
     refreshKey
   );
 
-  // Force refresh proposals when a transaction is confirmed
   useEffect(() => {
     if (isTransactionConfirmed) {
-      // Trigger a refresh by updating the key
       setTimeout(() => {
-        setRefreshKey((prev) => prev + 1);
+        refetchProposals();
+        setRefreshKey((prev) => prev + 1); // Still need this for other hooks
       }, 2000); // Wait a bit for the blockchain to update
     }
-  }, [isTransactionConfirmed]);
+  }, [isTransactionConfirmed, refetchProposals]);
 
   const handleVoteClick = (proposalId: number, description: string) => {
     setSelectedProposal({ id: proposalId, description });
@@ -61,10 +59,9 @@ export default function HomePage() {
   const handleVoteModalClose = () => {
     setShowVoteModal(false);
     setSelectedProposal(null);
-    // Trigger refresh after voting
-    setTimeout(() => {
-      setRefreshKey((prev) => prev + 1);
-    }, 1000);
+    // Trigger immediate refresh after voting
+    refetchProposals();
+    setRefreshKey((prev) => prev + 1);
   };
 
   if (!isConnected) {
@@ -150,7 +147,9 @@ export default function HomePage() {
               <Users className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">-</div>
+              <div className="text-2xl font-bold">
+                {isLoadingVoteCount ? "..." : userVoteCount}
+              </div>
             </CardContent>
           </Card>
 
@@ -194,89 +193,15 @@ export default function HomePage() {
                 </Card>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {proposals.map((proposal) => {
-                    const deadlineDate = new Date(proposal.deadline * 1000);
-                    const timeRemaining = Math.max(
-                      0,
-                      deadlineDate.getTime() - Date.now()
-                    );
-                    const days = Math.floor(
-                      timeRemaining / (1000 * 60 * 60 * 24)
-                    );
-                    const hours = Math.floor(
-                      (timeRemaining % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60)
-                    );
-
-                    let statusText = "Closed";
-                    let statusVariant: "default" | "secondary" | "destructive" =
-                      "destructive";
-
-                    if (proposal.status === 0) {
-                      statusText = "Active";
-                      statusVariant = "default";
-                    } else if (proposal.status === 1) {
-                      statusText = "Pending";
-                      statusVariant = "secondary";
-                    }
-
-                    return (
-                      <Card
-                        key={proposal.id}
-                        className="hover:shadow-lg transition-shadow"
-                      >
-                        <CardHeader>
-                          <div className="flex justify-between items-start">
-                            <CardTitle className="text-lg line-clamp-2">
-                              {proposal.description}
-                            </CardTitle>
-                            <Badge variant={statusVariant}>{statusText}</Badge>
-                          </div>
-                          <CardDescription>
-                            Proposal #{proposal.id}
-                          </CardDescription>
-                        </CardHeader>
-
-                        <CardContent>
-                          <div className="space-y-2 text-sm">
-                            <div className="flex justify-between">
-                              <span className="text-gray-500">
-                                Time remaining:
-                              </span>
-                              <span className="font-medium">
-                                {timeRemaining > 0
-                                  ? `${days}d ${hours}h`
-                                  : "Expired"}
-                              </span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span className="text-gray-500">Created by:</span>
-                              <span className="font-mono text-xs">
-                                {proposal.creator.slice(0, 6)}...
-                                {proposal.creator.slice(-4)}
-                              </span>
-                            </div>
-                          </div>
-                        </CardContent>
-
-                        <CardFooter className="flex gap-2">
-                          <Button
-                            className="flex-1"
-                            disabled={proposal.status !== 0}
-                            onClick={() =>
-                              handleVoteClick(proposal.id, proposal.description)
-                            }
-                          >
-                            Vote
-                          </Button>
-                          <Button variant="outline" asChild className="flex-1">
-                            <Link href={`/proposal/${proposal.id}`}>
-                              View Details
-                            </Link>
-                          </Button>
-                        </CardFooter>
-                      </Card>
-                    );
-                  })}
+                  {proposals.map((proposal) => (
+                    <ProposalCard
+                      key={proposal.id}
+                      proposal={proposal}
+                      contractAddress={CONTRACT_ADDRESS}
+                      onVoteClick={handleVoteClick}
+                      refreshKey={refreshKey}
+                    />
+                  ))}
                 </div>
               )}
             </>

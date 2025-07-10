@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useProposal } from './useProposal';
+import { useState, useEffect, useCallback } from 'react';
+import { usePublicClient } from 'wagmi';
 
 export interface Proposal {
   id: number;
@@ -9,8 +9,24 @@ export interface Proposal {
   deadline: number;
   status: number;
   createdAt: number;
-  creator: `0x${string}`;
+  creator: string;
 }
+
+const PROPOSAL_ABI = [
+  {
+    "inputs": [{"internalType": "uint256", "name": "proposalId", "type": "uint256"}],
+    "name": "getProposal",
+    "outputs": [
+      {"internalType": "string", "name": "description", "type": "string"},
+      {"internalType": "uint256", "name": "deadline", "type": "uint256"},
+      {"internalType": "enum SecretVote.VotingStatus", "name": "status", "type": "uint8"},
+      {"internalType": "uint256", "name": "createdAt", "type": "uint256"},
+      {"internalType": "address", "name": "creator", "type": "address"}
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  }
+] as const;
 
 export const useProposals = (
   contractAddress: string, 
@@ -19,39 +35,78 @@ export const useProposals = (
 ) => {
   const [proposals, setProposals] = useState<Proposal[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const publicClient = usePublicClient();
+
+  const fetchProposals = useCallback(async () => {
+    if (!contractAddress || !proposalCount || !publicClient) {
+      setProposals([]);
+      setIsLoading(false);
+      return;
+    }
+
+    const count = Number(proposalCount);
+    if (count === 0) {
+      setProposals([]);
+      setIsLoading(false);
+      return;
+    }
+
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      // Fetch recent proposals (up to 10 most recent)
+      const maxProposals = Math.min(count, 10);
+      const startId = Math.max(0, count - maxProposals);
+      
+      const proposalPromises = [];
+      for (let i = startId; i < count; i++) {
+        const promise = publicClient.readContract({
+          address: contractAddress as `0x${string}`,
+          abi: PROPOSAL_ABI,
+          functionName: 'getProposal',
+          args: [BigInt(i)],
+        });
+        proposalPromises.push(promise);
+      }
+
+      const results = await Promise.all(proposalPromises);
+      
+      const fetchedProposals: Proposal[] = results.map((result, index) => ({
+        id: startId + index,
+        description: result[0],
+        deadline: Number(result[1]),
+        status: result[2],
+        createdAt: Number(result[3]),
+        creator: result[4],
+      }));
+
+      // Sort by ID descending (most recent first)
+      fetchedProposals.sort((a, b) => b.id - a.id);
+      
+      setProposals(fetchedProposals);
+    } catch (err) {
+      console.error('Error fetching proposals:', err);
+      setError(err instanceof Error ? err.message : 'Failed to fetch proposals');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [contractAddress, proposalCount, publicClient]);
+
+  const refetch = useCallback(() => {
+    fetchProposals();
+  }, [fetchProposals]);
 
   useEffect(() => {
-    const fetchProposals = async () => {
-      if (!proposalCount || Number(proposalCount) === 0 || !contractAddress) {
-        setProposals([]);
-        return;
-      }
-
-      setIsLoading(true);
-      
-      try {
-        // For now, create mock proposals since we can't call multiple useProposal hooks dynamically
-        // In a real implementation, you'd need to restructure this differently
-        const mockProposals: Proposal[] = Array.from({ length: Number(proposalCount) }, (_, i) => ({
-          id: i,
-          description: `Proposal ${i}: Sample governance proposal for testing the voting system`,
-          deadline: Math.floor(Date.now() / 1000) + 86400, // 24 hours from now
-          status: 0, // Active
-          createdAt: Math.floor(Date.now() / 1000) - 3600, // 1 hour ago
-          creator: "0x1234567890123456789012345678901234567890" as `0x${string}`,
-        }));
-
-        setProposals(mockProposals);
-      } catch (error) {
-        console.error('Error fetching proposals:', error);
-        setProposals([]);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
     fetchProposals();
-  }, [contractAddress, proposalCount, refreshKey]);
+  }, [fetchProposals, refreshKey]);
 
-  return { proposals, isLoading };
+  return { 
+    proposals, 
+    isLoading,
+    error,
+    refetch
+  };
 };

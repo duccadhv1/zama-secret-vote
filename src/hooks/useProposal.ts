@@ -84,20 +84,22 @@ export const useProposal = (contractAddress: string, proposalId: number) => {
 };
 
 export const useHasVoted = (contractAddress: string, proposalId: number, voterAddress?: string) => {
-  const { data: hasVoted, isLoading, error } = useReadContract({
+  const { data: hasVoted, isLoading, error, refetch } = useReadContract({
     address: contractAddress as `0x${string}`,
     abi: PROPOSAL_ABI,
     functionName: 'getHasVoted',
     args: [BigInt(proposalId), voterAddress as `0x${string}`],
     query: {
       enabled: !!contractAddress && proposalId >= 0 && !!voterAddress,
+      staleTime: 0, // Always fetch fresh data for voting status
     }
   });
 
   return {
     hasVoted: hasVoted || false,
     isLoading,
-    error
+    error,
+    refetch
   };
 };
 
@@ -110,7 +112,7 @@ export const useProposalResults = (contractAddress: string, proposalId: number, 
     proposal.status === 2
   );
 
-  const { data: resultsData, isLoading, error } = useReadContract({
+  const { data: resultsData, isLoading, error, refetch } = useReadContract({
     address: contractAddress as `0x${string}`,
     abi: PROPOSAL_ABI,
     functionName: 'getResults',
@@ -138,5 +140,6 @@ export const useProposalResults = (contractAddress: string, proposalId: number, 
     isLoading: canFetchResults ? isLoading : false, // Don't show loading if we can't fetch
     error: canFetchResults ? error : null, // Don't show error if we're not supposed to fetch
     canFetchResults, // Export this so components can know if results are available
+    refetch, // Export refetch function
   };
 };

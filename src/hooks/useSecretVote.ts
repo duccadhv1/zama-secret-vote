@@ -174,10 +174,6 @@ export const useSecretVote = (contractAddress: string): UseSecretVoteReturn => {
 
   // Create proposal
   const createProposal = useCallback((description: string, duration: number): void => {
-    console.log("🚀 ~ createProposal ~ Starting createProposal function");
-    console.log("Contract Address:", contractAddress);
-    console.log("Description:", description);
-    console.log("Duration:", duration);
     
     if (!contractAddress) {
       console.error("Contract address is not defined");
